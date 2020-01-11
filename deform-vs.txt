@@ -5,11 +5,13 @@ uniform mat4 modelMatrix;
 uniform vec4 color;
 
 attribute vec4 position;
-attribute vec4 s;
+attribute vec2 texCoord;
 
 varying vec4 v_color;
+varying vec2 v_texCoord;
 
 void main(void) {
     gl_Position = projectionMatrix * viewMatrix * modelMatrix * position;
     v_color = color;
+    v_texCoord = texCoord;
 }

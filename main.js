@@ -2,7 +2,7 @@ import * as GLUtils from "./GLUtils.js";
 import * as MatUtils from "./MatUtils.js";
 import * as FetchUtils from "./FetchUtils.js";
 
-(function() {
+(function () {
 
     let canvas;
 
@@ -45,6 +45,8 @@ import * as FetchUtils from "./FetchUtils.js";
     addEventListener("load", onLoad);
     addEventListener("unload", onUnload);
 
+    const POINT_SIZE = 0.04;
+
     let gl;
     let animationHandle;
     let program;
@@ -57,17 +59,25 @@ import * as FetchUtils from "./FetchUtils.js";
         "viewMatrix": null,
         "modelMatrix": null,
         "color": null,
+        "texture": null,
     };
-    let vertexBuffer = null;
-    let indexBuffer = null;
+    let rectVertexBuffer = null;
+    let rectIndexBuffer = null;
+    let gridVertexBuffer = null;
+    let whiteTexture = null;
     let texture = null;
+
     let rectCorners = [
         [0, 0],
-        [0, 0],
-        [0, 0],
-        [0, 0]
+        [1, 0],
+        [0, 1],
+        [1, 1]
     ];
-    let pointSize = 0.05;
+    let selectedCorner = -1;
+    let selectedOffset = [0, 0];
+    let selectedRect = false;
+
+    let lastCoord = [0, 0];
 
     function initializeGL() {
         (async () => {
@@ -76,16 +86,24 @@ import * as FetchUtils from "./FetchUtils.js";
                 gl,
                 await FetchUtils.getText("deform-vs.txt"), await FetchUtils.getText("deform-fs.txt"),
                 attributes, uniforms);
-            vertexBuffer = GLUtils.createArrayBuffer(gl, new Float32Array([
+            rectVertexBuffer = GLUtils.createArrayBuffer(gl, new Float32Array([
                 0, 0, 0, 0, 0,
-                0.5, 0, 0, 1, 0,
-                0, 0.5, 0, 0, 1,
-                0.5, 0.5, 0, 1, 1,
+                1, 0, 0, 1, 0,
+                0, 1, 0, 0, 1,
+                1, 1, 0, 1, 1,
             ]));
-            indexBuffer = GLUtils.createElementArrayBuffer(gl, new Uint16Array([
+            rectIndexBuffer = GLUtils.createElementArrayBuffer(gl, new Uint16Array([
                 0, 1, 2, 1, 3, 2,
             ]));
+            gridVertexBuffer  = GLUtils.createArrayBuffer(gl, new Float32Array([
+                1000, 0, 0,
+                -1000, 0, 0,
+                0, 1000, 0,
+                0, -1000, 0,
+            ]));
+            whiteTexture = GLUtils.createTextureFromImage(gl, await FetchUtils.getImage("white.png"));
             texture = GLUtils.createTextureFromImage(gl, await FetchUtils.getImage("image.png"));
+            gl.viewport(0, 0, canvas.width, canvas.height);
             gl.clearColor(0.5, 0.5, 0.5, 1);
             onUpdateGL(0);
         })();
@@ -108,13 +126,56 @@ import * as FetchUtils from "./FetchUtils.js";
         gl.getExtension('WEBGL_lose_context').restoreContext();
     }
 
-    function onCursorDownGL (x, y) {
+    function onCursorDownGL(x, y) {
+        x = x * 2 - 0.5;
+        y = y * 2 - 0.5;
+
+        for (let i = 0; i < 4; ++i) {
+            let corner = rectCorners[i];
+            let cx = corner[0];
+            let cy = corner[1];
+            if (cx - POINT_SIZE / 2 <= x && x <= cx + POINT_SIZE / 2 &&
+                cy - POINT_SIZE / 2 <= y && y <= cy + POINT_SIZE / 2) {
+                selectedCorner = i;
+                selectedOffset[0] = x - cx;
+                selectedOffset[1] = y - cy;
+                break;
+            }
+        }
+
+        if (selectedCorner == -1) {
+            selectedRect = true;
+        }
+
+        lastCoord[0] = x;
+        lastCoord[1] = y;
     }
 
     function onCursorUpGL(x, y) {
+        selectedCorner = -1;
+        selectedRect = false;
     }
 
     function onCursorMoveGL(x, y) {
+        x = x * 2 - 0.5;
+        y = y * 2 - 0.5;
+
+        if (selectedCorner != -1) {
+            let corner = rectCorners[selectedCorner];
+            corner[0] = x - selectedOffset[0];
+            corner[1] = y - selectedOffset[1];
+        }
+
+        if (selectedRect) {
+            for (let i = 0; i < 4; ++i) {
+                let corner = rectCorners[i];
+                corner[0] += x - lastCoord[0];
+                corner[1] += y - lastCoord[1];
+            }
+        }
+
+        lastCoord[0] = x;
+        lastCoord[1] = y;
     }
 
     function onUpdateGL(time) {
@@ -126,25 +187,106 @@ import * as FetchUtils from "./FetchUtils.js";
 
         let projectionMatrix = new Float32Array(16);
         MatUtils.setIdentity(projectionMatrix);
-        MatUtils.mulScaling(projectionMatrix, 2.0, -2.0, 1.0);
+        MatUtils.mulScaling(projectionMatrix, 1, -1, 1.0);
         MatUtils.mulTranslation(projectionMatrix, -0.5, -0.5, 0.0);
+        gl.uniformMatrix4fv(uniforms.projectionMatrix, false, projectionMatrix);
+
         let viewMatrix = new Float32Array(16);
         MatUtils.setIdentity(viewMatrix);
-        let modelMatrix = new Float32Array(16);
-        MatUtils.setIdentity(modelMatrix);
-
-        gl.uniformMatrix4fv(uniforms.projectionMatrix, false, projectionMatrix);
         gl.uniformMatrix4fv(uniforms.viewMatrix, false, viewMatrix);
-        gl.uniformMatrix4fv(uniforms.modelMatrix, false, modelMatrix);
-        gl.uniform4f(uniforms.color, 1, 0, 0, 1);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        let modelMatrix = new Float32Array(16);
+
+        // グリッド線を描画
+        gl.bindBuffer(gl.ARRAY_BUFFER, gridVertexBuffer);
+        gl.enableVertexAttribArray(attributes.position);
+        gl.vertexAttribPointer(attributes.position, 3, gl.FLOAT, false, 4 * 3, 0);
+
+        gl.uniform4f(uniforms.color, 0.6, 0.6, 0.6, 1);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, whiteTexture);
+        gl.uniform1i(uniforms.texture, 0);
+
+        for (let i = 0; i < 25; ++i) {
+            MatUtils.setIdentity(modelMatrix);
+            MatUtils.mulTranslation(modelMatrix, 0.1 * i - 1, 0.1 * i - 1, 0);
+            gl.uniformMatrix4fv(uniforms.modelMatrix, false, modelMatrix);
+            gl.drawArrays(gl.LINES, 0, 4);
+        }
+
+        MatUtils.setIdentity(modelMatrix);
+        MatUtils.mulTranslation(modelMatrix, 1, 1, 0);
+        gl.uniformMatrix4fv(uniforms.modelMatrix, false, modelMatrix);
+        gl.uniform4f(uniforms.color, 0.9, 0.9, 0.9, 1);
+        gl.drawArrays(gl.LINES, 0, 4);
+
+        MatUtils.setIdentity(modelMatrix);
+        gl.uniformMatrix4fv(uniforms.modelMatrix, false, modelMatrix);
+
+        gl.uniform4f(uniforms.color, 1, 0.2, 0.2, 1);
+        gl.drawArrays(gl.LINES, 0, 2);
+        gl.uniform4f(uniforms.color, 0.2, 1, 0.2, 1);
+        gl.drawArrays(gl.LINES, 2, 2);
+
+        // 変形画像を描画
+        gl.bindBuffer(gl.ARRAY_BUFFER, rectVertexBuffer);
         gl.enableVertexAttribArray(attributes.position);
         gl.enableVertexAttribArray(attributes.texCoord);
         gl.vertexAttribPointer(attributes.position, 3, gl.FLOAT, false, 4 * (3 + 2), 0);
         gl.vertexAttribPointer(attributes.texCoord, 2, gl.FLOAT, false, 4 * (3 + 2), 4 * 3);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, rectIndexBuffer);
+
+        MatUtils.setIdentity(modelMatrix);
+        MatUtils.setDeform(modelMatrix,
+            rectCorners[0][0], rectCorners[0][1],
+            rectCorners[1][0], rectCorners[1][1],
+            rectCorners[2][0], rectCorners[2][1],
+            rectCorners[3][0], rectCorners[3][1]);
+        gl.uniformMatrix4fv(uniforms.modelMatrix, false, modelMatrix);
+
+        gl.uniform4f(uniforms.color, 1, 1, 1, 1);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(uniforms.texture, 0);
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+
+        // 変形ガイドを描画
+        gl.uniform4f(uniforms.color, 1, 1, 1, 1);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, whiteTexture);
+        gl.uniform1i(uniforms.texture, 0);
+
+        for (let i = 0; i < 4; ++i) {
+            let modelMatrix = new Float32Array(16);
+            MatUtils.setIdentity(modelMatrix);
+            MatUtils.mulTranslation(modelMatrix, rectCorners[i][0], rectCorners[i][1], 0);
+            MatUtils.mulScaling(modelMatrix, POINT_SIZE, POINT_SIZE, 1);
+            MatUtils.mulTranslation(modelMatrix, -0.5, -0.5, 0);
+            gl.uniformMatrix4fv(uniforms.modelMatrix, false, modelMatrix);
+            gl.uniform4f(uniforms.color, 0, 0, 0, 1);
+            gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+
+            MatUtils.setIdentity(modelMatrix);
+            MatUtils.mulTranslation(modelMatrix, rectCorners[i][0], rectCorners[i][1], 0);
+            MatUtils.mulScaling(modelMatrix, POINT_SIZE * 0.85, POINT_SIZE * 0.85, 1);
+            MatUtils.mulTranslation(modelMatrix, -0.5, -0.5, 0);
+            gl.uniformMatrix4fv(uniforms.modelMatrix, false, modelMatrix);
+            gl.uniform4f(uniforms.color, 1, 1, 1, 1);
+            gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+
+            MatUtils.setIdentity(modelMatrix);
+            MatUtils.mulTranslation(modelMatrix, rectCorners[i][0], rectCorners[i][1], 0);
+            MatUtils.mulScaling(modelMatrix, POINT_SIZE * 0.5, POINT_SIZE * 0.5, 1);
+            MatUtils.mulTranslation(modelMatrix, -0.5, -0.5, 0);
+            gl.uniformMatrix4fv(uniforms.modelMatrix, false, modelMatrix);
+            if (i == selectedCorner) {
+                gl.uniform4f(uniforms.color, 1, 0, 0, 1);
+            } else {
+                gl.uniform4f(uniforms.color, 0, 0, 0, 1);
+            }
+            gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+        }
+
         gl.disableVertexAttribArray(attributes.position);
         gl.disableVertexAttribArray(attributes.texCoord);
 

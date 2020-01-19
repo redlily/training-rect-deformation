@@ -127,15 +127,15 @@ import * as FetchUtils from "./FetchUtils.js";
     }
 
     function onCursorDownGL(x, y) {
-        x = x * 2 - 0.5;
-        y = y * 2 - 0.5;
+        x = x * 2 / 1.25 - 0.3;
+        y = y * 2 / 1.25 - 0.3;
 
         for (let i = 0; i < 4; ++i) {
             let corner = rectCorners[i];
             let cx = corner[0];
             let cy = corner[1];
-            if (cx - POINT_SIZE / 2 <= x && x <= cx + POINT_SIZE / 2 &&
-                cy - POINT_SIZE / 2 <= y && y <= cy + POINT_SIZE / 2) {
+            if (cx - POINT_SIZE <= x && x <= cx + POINT_SIZE &&
+                cy - POINT_SIZE <= y && y <= cy + POINT_SIZE) {
                 selectedCorner = i;
                 selectedOffset[0] = x - cx;
                 selectedOffset[1] = y - cy;
@@ -157,8 +157,10 @@ import * as FetchUtils from "./FetchUtils.js";
     }
 
     function onCursorMoveGL(x, y) {
-        x = x * 2 - 0.5;
-        y = y * 2 - 0.5;
+        x = x * 2 / 1.25 - 0.3;
+        y = y * 2 / 1.25 - 0.3;
+
+        console.log(x, y);
 
         if (selectedCorner != -1) {
             let corner = rectCorners[selectedCorner];
@@ -187,7 +189,7 @@ import * as FetchUtils from "./FetchUtils.js";
 
         let projectionMatrix = new Float32Array(16);
         MatUtils.setIdentity(projectionMatrix);
-        MatUtils.mulScaling(projectionMatrix, 1, -1, 1.0);
+        MatUtils.mulScaling(projectionMatrix, 1.25, -1.25, 1.0);
         MatUtils.mulTranslation(projectionMatrix, -0.5, -0.5, 0.0);
         gl.uniformMatrix4fv(uniforms.projectionMatrix, false, projectionMatrix);
 

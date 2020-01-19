@@ -318,11 +318,8 @@ export function setDeform(dst, sx, sy, xx, xy, yx, yy, ex, ey) {
     let esy = sy - ey;
 
     let det = exx * eyy - exy * eyx; // (x - e) × (y - e) 終点、点X、点Yの三角形の面積
-    let hx = (exx * esy - exy * esx) / det; // (x - e) × (s - e) / ((x - e) × (y - e)) 始点、終点、点Xの三角形と終点、点X、点Yの面積比
-    let hy = (esx * eyy - esy * eyx) / det; // (s - e) × (y - e) / ((x - e) × (y - e)) 始点、終点、点Yの三角形と終点、点X、点Yの面積比
-
-    let dx = hx;
-    let dy = hy;
+    let dx = (exx * esy - exy * esx) / det; // (x - e) × (s - e) / ((x - e) × (y - e)) 始点、終点、点Xの三角形と終点、点X、点Yの面積比
+    let dy = (esx * eyy - esy * eyx) / det; // (s - e) × (y - e) / ((x - e) × (y - e)) 始点、終点、点Yの三角形と終点、点X、点Yの面積比
 
     mulMatrix(
         dst,

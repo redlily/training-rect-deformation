@@ -63,6 +63,7 @@ import * as FetchUtils from "./FetchUtils.js";
     };
     let rectVertexBuffer = null;
     let rectIndexBuffer = null;
+    let lineIndexBuffer = null;
     let gridVertexBuffer = null;
     let whiteTexture = null;
     let texture = null;
@@ -94,6 +95,9 @@ import * as FetchUtils from "./FetchUtils.js";
             ]));
             rectIndexBuffer = GLUtils.createElementArrayBuffer(gl, new Uint16Array([
                 0, 1, 2, 1, 3, 2,
+            ]));
+            lineIndexBuffer = GLUtils.createElementArrayBuffer(gl, new Uint16Array([
+                0, 1, 1, 2, 2, 0, 1, 3, 3, 2
             ]));
             gridVertexBuffer  = GLUtils.createArrayBuffer(gl, new Float32Array([
                 1000, 0, 0,
@@ -252,7 +256,15 @@ import * as FetchUtils from "./FetchUtils.js";
         gl.uniform1i(uniforms.texture, 0);
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
+        // ポリゴン描画
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
+        gl.uniform4f(uniforms.color, 1, 0, 0, 1);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, whiteTexture);
+        gl.drawElements(gl.LINES, 10, gl.UNSIGNED_SHORT, 0);
+
         // 変形ガイドを描画
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, rectIndexBuffer);
         gl.uniform4f(uniforms.color, 1, 1, 1, 1);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, whiteTexture);

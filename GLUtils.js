@@ -18,6 +18,17 @@ export function createArrayBuffer(gl, data, usage = gl.STATIC_DRAW) {
     return createBuffer(gl, gl.ARRAY_BUFFER, data, usage);
 }
 
+export function setArrayBuffer(gl, buf, off, data) {
+    let tmp = gl.getParameter(gl.ARRAY_BUFFER_BINDING);
+    if (tmp != buf) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    }
+    gl.bufferSubData(gl.ARRAY_BUFFER, off, data);
+    if (tmp != buf) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, tmp);
+    }
+}
+
 export function createElementArrayBuffer(gl, data, usage = gl.STATIC_DRAW) {
     return createBuffer(gl, gl.ELEMENT_ARRAY_BUFFER, data, usage);
 }

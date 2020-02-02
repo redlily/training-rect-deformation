@@ -68,11 +68,11 @@ import * as FetchUtils from "./FetchUtils.js";
     let whiteTexture = null;
     let texture = null;
 
-    let rectCorners = [
-        [0, 0],
-        [1, 0],
-        [0, 1],
-        [1, 1]
+    let rectCorners= [
+        [0.2, 0.1],
+        [1.2, -0.1],
+        [-0.1, 0.8],
+        [0.8, 1.2]
     ];
     let selectedCorner = -1;
     let selectedOffset = [0, 0];
